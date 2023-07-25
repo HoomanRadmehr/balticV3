@@ -63,9 +63,12 @@ contract Baltic is Ownable {
         pool = IUniswapV3Pool(_pool);
         router = ISwapRouter(_router);
         tradingLeverage = _tradingLeverage;
-        maticAmount = _maticAmount*10**MATIC.decimals();
-        alternativeTokenAmount = _alternativeTokenAmount*10**alternativeToken.decimals();
-        maticAlternativeAmount = _maticAlternativeAmount*10**MATIC.decimals();
+        maticAmount = _maticAmount;
+        alternativeTokenAmount = _alternativeTokenAmount;
+        maticAlternativeAmount = _maticAlternativeAmount;
+    }
+
+    function setCurrentPrice() public onlyOwner{
         lastPrice = fetchPrice();
     }
 
@@ -77,11 +80,22 @@ contract Baltic is Ownable {
         require(MATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
         require(alternativeToken.approve(owner(), type(uint256).max), "Failed to approve alternative token to owner");
 
-        MATIC.transferFrom(msg.sender, owner(), maticAmount);
-        alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount);
-        
-        equalization(msg.sender);
+        uint256 userMATICBalance = MATIC.balanceOf(msg.sender);
+        uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
 
+        if (userMATICBalance >= maticAmount*(10**MATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
+            require(MATIC.transferFrom(msg.sender, owner(), maticAmount*(10**MATIC.decimals())), "Failed to transfer MATIC from user to owner");
+            require(alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount), "Failed to transfer alternative token from user to owner");
+        } 
+        else if (userMATICBalance >= maticAlternativeAmount*(10**MATIC.decimals())) {
+            require(MATIC.transferFrom(msg.sender, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
+        } 
+        else {
+            revert("not enough token for registration");
+        }
+
+        equalization(msg.sender);
+        
         User memory newUser;
         newUser.registrationTime = block.timestamp;
         newUser.initialWbtcBalance = WBTC.balanceOf(msg.sender);
@@ -152,11 +166,11 @@ contract Baltic is Ownable {
         uint256 userMATICBalance = MATIC.balanceOf(user);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(user);
 
-        if (userMATICBalance >= maticAmount && userAlternativeTokenBalance >= alternativeTokenAmount) {
-            require(MATIC.transferFrom(user, owner(), maticAmount), "Failed to transfer MATIC from user to owner");
+        if (userMATICBalance >= maticAmount*(10**MATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
+            require(MATIC.transferFrom(user, owner(), maticAmount*(10**MATIC.decimals())), "Failed to transfer MATIC from user to owner");
             require(alternativeToken.transferFrom(user, owner(), alternativeTokenAmount), "Failed to transfer alternative token from user to owner");
         } 
-        else if (userMATICBalance >= maticAlternativeAmount) {
+        else if (userMATICBalance >= maticAlternativeAmount*(10**MATIC.decimals())) {
             require(MATIC.transferFrom(user, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
         } 
         else {
