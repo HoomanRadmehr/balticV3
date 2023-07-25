@@ -93,12 +93,12 @@ contract Baltic is Ownable {
         uint256 wbtcBalance = WBTC.balanceOf(user);
         uint256 wethBalance = WETH.balanceOf(user);
 
-        uint256 wbtcValueInWeth = wbtcBalance.mul(lastPrice).div(10**WETH.decimals());
+        uint256 wbtcValueInWeth = wbtcBalance.mul(lastPrice);
         uint256 wethValueInWeth = wethBalance;
 
         if (wbtcValueInWeth > wethValueInWeth) {
             uint256 excessValue = (wbtcValueInWeth - wethValueInWeth) / 2;
-            uint256 excessWbtc = excessValue.mul(10**WBTC.decimals()).div(lastPrice);
+            uint256 excessWbtc = excessValue.div(lastPrice);
             executeSwap(WBTC, WETH, user, excessWbtc);
         } else if (wethValueInWeth > wbtcValueInWeth) {
             uint256 excessValue = (wethValueInWeth - wbtcValueInWeth) / 2;
@@ -137,10 +137,10 @@ contract Baltic is Ownable {
             }
 
             if (currentPrice > lastPrice) {
-                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).mul(priceChangeInWbtc).div(10**WBTC.decimals());
+                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).mul(priceChangeInWbtc);
                 executeSwap(WBTC, WETH, registeredUsers[i], tradeAmount);
             } else if (currentPrice < lastPrice) {
-                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).div(priceChangeInWbtc).div(10**WETH.decimals());
+                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).div(priceChangeInWbtc);
                 executeSwap(WETH, WBTC, registeredUsers[i], tradeAmount);
             }
         }
