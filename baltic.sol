@@ -24,8 +24,8 @@ interface IERC20WithDecimals is IERC20 {
 contract Baltic is Ownable {
     using SafeMath for uint256;
 
-    IERC20 public MATIC;
-    IERC20 public alternativeToken;
+    IERC20WithDecimals public MATIC;
+    IERC20WithDecimals public alternativeToken;
     IUniswapV3Pool public pool;
     ISwapRouter public router;
     IERC20WithDecimals public WBTC;
@@ -58,14 +58,14 @@ contract Baltic is Ownable {
     ) {
         WBTC = IERC20WithDecimals(_WBTC);
         WETH = IERC20WithDecimals(_WETH);
-        MATIC = IERC20(_MATIC);
-        alternativeToken = IERC20(_alternativeToken);
+        MATIC = IERC20WithDecimals(_MATIC);
+        alternativeToken = IERC20WithDecimals(_alternativeToken);
         pool = IUniswapV3Pool(_pool);
         router = ISwapRouter(_router);
         tradingLeverage = _tradingLeverage;
-        maticAmount = _maticAmount;
-        alternativeTokenAmount = _alternativeTokenAmount;
-        maticAlternativeAmount = _maticAlternativeAmount;
+        maticAmount = _maticAmount*10**MATIC.decimals();
+        alternativeTokenAmount = _alternativeTokenAmount*10**alternativeToken.decimals();
+        maticAlternativeAmount = _maticAlternativeAmount*10**MATIC.decimals();
         lastPrice = fetchPrice();
     }
 
