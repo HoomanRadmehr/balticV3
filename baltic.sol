@@ -66,6 +66,7 @@ contract Baltic is Ownable {
         maticAmount = _maticAmount;
         alternativeTokenAmount = _alternativeTokenAmount;
         maticAlternativeAmount = _maticAlternativeAmount;
+        lastPrice = fetchPrice();
     }
 
     function payReg() external {
