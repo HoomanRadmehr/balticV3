@@ -72,9 +72,8 @@ contract Baltic is Ownable {
         lastPrice = fetchPrice();
     }
 
-    function payReg() external {
+    function payReg() external{
         require(!users[msg.sender].isActive, "Already registered");
-
         require(WBTC.approve(address(router), type(uint256).max), "Failed to approve WBTC to Uniswap");
         require(WETH.approve(address(router), type(uint256).max), "Failed to approve WETH to Uniswap");
         require(MATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
@@ -155,7 +154,7 @@ contract Baltic is Ownable {
                 uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).mul(priceChangeInWbtc);
                 executeSwap(WBTC, WETH, registeredUsers[i], tradeAmount);
             } else if (currentPrice < lastPrice) {
-                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).div(priceChangeInWbtc);
+                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).mul(10**(WBTC.decimals()-WETH.decimals())).mul(priceChangeInWbtc);
                 executeSwap(WETH, WBTC, registeredUsers[i], tradeAmount);
             }
         }
