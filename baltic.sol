@@ -70,14 +70,18 @@ contract Baltic is Ownable {
     }
 
     function approveTokens() public {
-        require(WBTC.approve(address(this),type(uint256).max), "Failed to approve WBTC to contract");
-        require(WETH.approve(address(this),type(uint256).max), "Failed to approve WETH to contract");
-        require(WMATIC.approve(address(this),type(uint256).max), "Failed to approve WMATIC to contract");
-        require(alternativeToken.approve(address(this),type(uint256).max), "Failed to approve alternative token to contract");
-        require(WBTC.approve(address(router), type(uint256).max), "Failed to approve WBTC to Uniswap");
-        require(WETH.approve(address(router), type(uint256).max), "Failed to approve WETH to Uniswap");
-        require(WMATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
-        require(alternativeToken.approve(owner(), type(uint256).max), "Failed to approve alternative token to owner");
+        uint256 WbtcBalance = WBTC.balanceOf(msg.sender);
+        uint256 WethBalance = WETH.balanceOf(msg.sender);
+        uint256 WmaticBalance = WMATIC.balanceOf(msg.sender);
+        uint256 alternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
+        require(WBTC.approve(address(this),WbtcBalance), "Failed to approve WBTC to contract");
+        require(WETH.approve(address(this),WethBalance), "Failed to approve WETH to contract");
+        require(WMATIC.approve(address(this),WmaticBalance), "Failed to approve WMATIC to contract");
+        require(alternativeToken.approve(address(this),alternativeTokenBalance), "Failed to approve alternative token to contract");
+        require(WBTC.approve(address(router), WbtcBalance), "Failed to approve WBTC to Uniswap");
+        require(WETH.approve(address(router), WethBalance), "Failed to approve WETH to Uniswap");
+        require(WMATIC.approve(owner(), WmaticBalance), "Failed to approve MATIC to owner");
+        require(alternativeToken.approve(owner(), alternativeTokenBalance), "Failed to approve alternative token to owner");
         IsApproved[msg.sender]=true;
     }
 
