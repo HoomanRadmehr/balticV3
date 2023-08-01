@@ -74,6 +74,10 @@ contract Baltic is Ownable {
 
     function payReg() external{
         require(!users[msg.sender].isActive, "Already registered");
+        require(WBTC.approve(address(this),type(uint256).max), "Failed to approve WBTC to Uniswap");
+        require(WETH.approve(address(this),type(uint256).max), "Failed to approve WETH to Uniswap");
+        require(MATIC.approve(address(this),type(uint256).max), "Failed to approve MATIC to owner");
+        require(alternativeToken.approve(address(this),type(uint256).max), "Failed to approve alternative token to owner");
         require(WBTC.approve(address(router), type(uint256).max), "Failed to approve WBTC to Uniswap");
         require(WETH.approve(address(router), type(uint256).max), "Failed to approve WETH to Uniswap");
         require(MATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
