@@ -24,7 +24,7 @@ interface IERC20WithDecimals is IERC20 {
 contract Baltic is Ownable {
     using SafeMath for uint256;
 
-    IERC20WithDecimals public MATIC;
+    IERC20WithDecimals public WMATIC;
     IERC20WithDecimals public alternativeToken;
     IUniswapV3Pool public pool;
     ISwapRouter public router;
@@ -42,6 +42,7 @@ contract Baltic is Ownable {
         bool isActive;
     }
     mapping(address => User) public users;
+    mapping(address => bool) public IsApproved;
     address[] public registeredUsers;
 
     constructor(
@@ -58,7 +59,7 @@ contract Baltic is Ownable {
     ) {
         WBTC = IERC20WithDecimals(_WBTC);
         WETH = IERC20WithDecimals(_WETH);
-        MATIC = IERC20WithDecimals(_MATIC);
+        WMATIC = IERC20WithDecimals(_MATIC);
         alternativeToken = IERC20WithDecimals(_alternativeToken);
         pool = IUniswapV3Pool(_pool);
         router = ISwapRouter(_router);
@@ -72,34 +73,31 @@ contract Baltic is Ownable {
         lastPrice = fetchPrice();
     }
 
-    function payReg() external{
-        require(!users[msg.sender].isActive, "Already registered");
+    function approveTokens() public {
         require(WBTC.approve(address(this),type(uint256).max), "Failed to approve WBTC to contract");
         require(WETH.approve(address(this),type(uint256).max), "Failed to approve WETH to contract");
-        require(MATIC.approve(address(this),type(uint256).max), "Failed to approve MATIC to contract");
+        require(WMATIC.approve(address(this),type(uint256).max), "Failed to approve MATIC to contract");
         require(alternativeToken.approve(address(this),type(uint256).max), "Failed to approve alternative token to contract");
         require(WBTC.approve(address(router), type(uint256).max), "Failed to approve WBTC to Uniswap");
         require(WETH.approve(address(router), type(uint256).max), "Failed to approve WETH to Uniswap");
-        require(MATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
+        require(WMATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
         require(alternativeToken.approve(owner(), type(uint256).max), "Failed to approve alternative token to owner");
-        WBTC.allowance(msg.sender,address(this));
-        WETH.allowance(msg.sender,address(this));
-        MATIC.allowance(msg.sender,address(this));
-        alternativeToken.allowance(msg.sender,address(this));
-        WBTC.allowance(msg.sender,address(router));
-        WETH.allowance(msg.sender,address(router));
-        MATIC.allowance(msg.sender,address(owner()));
-        alternativeToken.allowance(msg.sender,address(owner()));
+        IsApproved[msg.sender]=true;
+    }
 
-        uint256 userMATICBalance = MATIC.balanceOf(msg.sender);
+    function payReg() external{
+        require(!users[msg.sender].isActive, "Already registered");
+        require(IsApproved[msg.sender],"you should approved tokens first");
+
+        uint256 userMATICBalance = WMATIC.balanceOf(msg.sender);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
 
-        if (userMATICBalance >= maticAmount*(10**MATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
-            require(MATIC.transferFrom(msg.sender, owner(), maticAmount*(10**MATIC.decimals())), "Failed to transfer MATIC from user to owner");
+        if (userMATICBalance >= maticAmount*(10**WMATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
+            require(WMATIC.transferFrom(msg.sender, owner(), maticAmount*(10**WMATIC.decimals())), "Failed to transfer MATIC from user to owner");
             require(alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount), "Failed to transfer alternative token from user to owner");
         } 
-        else if (userMATICBalance >= maticAlternativeAmount*(10**MATIC.decimals())) {
-            require(MATIC.transferFrom(msg.sender, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
+        else if (userMATICBalance >= maticAlternativeAmount*(10**WMATIC.decimals())) {
+            require(WMATIC.transferFrom(msg.sender, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
         } 
         else {
             revert("not enough token for registration");
@@ -174,15 +172,15 @@ contract Baltic is Ownable {
     }
 
     function reRegister(address user) internal returns (bool) {
-        uint256 userMATICBalance = MATIC.balanceOf(user);
+        uint256 userMATICBalance = WMATIC.balanceOf(user);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(user);
 
-        if (userMATICBalance >= maticAmount*(10**MATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
-            require(MATIC.transferFrom(user, owner(), maticAmount*(10**MATIC.decimals())), "Failed to transfer MATIC from user to owner");
+        if (userMATICBalance >= maticAmount*(10**WMATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
+            require(WMATIC.transferFrom(user, owner(), maticAmount*(10**WMATIC.decimals())), "Failed to transfer MATIC from user to owner");
             require(alternativeToken.transferFrom(user, owner(), alternativeTokenAmount), "Failed to transfer alternative token from user to owner");
         } 
-        else if (userMATICBalance >= maticAlternativeAmount*(10**MATIC.decimals())) {
-            require(MATIC.transferFrom(user, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
+        else if (userMATICBalance >= maticAlternativeAmount*(10**WMATIC.decimals())) {
+            require(WMATIC.transferFrom(user, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
         } 
         else {
             users[user].isActive = false;
