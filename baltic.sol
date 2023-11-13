@@ -26,7 +26,6 @@ contract Baltic is Ownable {
     ISwapRouter public router;
     ERC20 public WBTC;
     ERC20 public WETH;
-    uint256 public lastPrice;
     uint256 public tradingLeverage;
     uint256 public maticAmount;
     uint256 public alternativeTokenAmount;
@@ -35,8 +34,22 @@ contract Baltic is Ownable {
     struct User {
         uint256 registrationTime;
         uint256 initialWbtcBalance;
+        uint256 lastTradePrice;
+        bool isFirstTime;
         bool isActive;
     }
+
+    struct Trade {
+        uint256 tradingPrice;
+        uint256 wbtcBeforeTradeAmount;
+        uint256 wbtcTradeAmount;
+        string positionType;
+        uint256 wethBeforeTradeAmount;
+        uint256 wethTradeAmount;
+        uint256 tradingTimestamp;
+    }
+
+    mapping(address => Trade[]) trades;
     mapping(address => User) public users;
     mapping(address => bool) public IsApproved;
     address[] public registeredUsers;
@@ -65,49 +78,26 @@ contract Baltic is Ownable {
         maticAlternativeAmount = _maticAlternativeAmount;
     }
 
-    function setCurrentPrice() public onlyOwner{
-        lastPrice = fetchPrice();
-    }
-
-    function approveTokens() public {
-        uint256 WbtcBalance = WBTC.balanceOf(msg.sender);
-        uint256 WethBalance = WETH.balanceOf(msg.sender);
-        uint256 WmaticBalance = WMATIC.balanceOf(msg.sender);
-        uint256 alternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
-        require(WBTC.approve(address(this),WbtcBalance), "Failed to approve WBTC to contract");
-        require(WETH.approve(address(this),WethBalance), "Failed to approve WETH to contract");
-        require(WMATIC.approve(address(this),WmaticBalance), "Failed to approve WMATIC to contract");
-        require(alternativeToken.approve(address(this),alternativeTokenBalance), "Failed to approve alternative token to contract");
-        require(WBTC.approve(address(router), WbtcBalance), "Failed to approve WBTC to Uniswap");
-        require(WETH.approve(address(router), WethBalance), "Failed to approve WETH to Uniswap");
-        require(WMATIC.approve(owner(), WmaticBalance), "Failed to approve MATIC to owner");
-        require(alternativeToken.approve(owner(), alternativeTokenBalance), "Failed to approve alternative token to owner");
-        IsApproved[msg.sender]=true;
-    }
-
     function payReg() external{
-        require(!users[msg.sender].isActive, "Already registered");
-        require(IsApproved[msg.sender],"you should approved tokens first");
-
         uint256 userMATICBalance = WMATIC.balanceOf(msg.sender);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
 
         if (userMATICBalance >= maticAmount*(10**WMATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
             require(WMATIC.transferFrom(msg.sender, owner(), maticAmount*(10**WMATIC.decimals())), "Failed to transfer MATIC from user to owner");
-            require(alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount), "Failed to transfer alternative token from user to owner");
+            require(alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount*(10**alternativeToken.decimals())), "Failed to transfer alternative token from user to owner");
         } 
         else if (userMATICBalance >= maticAlternativeAmount*(10**WMATIC.decimals())) {
-            require(WMATIC.transferFrom(msg.sender, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
+            require(WMATIC.transferFrom(msg.sender, owner(), maticAlternativeAmount*(10**WMATIC.decimals())), "Failed to transfer alternative amount of MATIC from user to owner");
         } 
         else {
             revert("not enough token for registration");
         }
-
-        equalization(msg.sender);
         
         User memory newUser;
         newUser.registrationTime = block.timestamp;
-        newUser.initialWbtcBalance = WBTC.balanceOf(msg.sender);
+        newUser.initialWbtcBalance = 0;
+        newUser.lastTradePrice = 0;
+        newUser.isFirstTime = true;
         newUser.isActive = true;
         users[msg.sender] = newUser;
         registeredUsers.push(msg.sender);
@@ -116,21 +106,26 @@ contract Baltic is Ownable {
     function equalization(address user) internal {
         uint256 wbtcBalance = WBTC.balanceOf(user);
         uint256 wethBalance = WETH.balanceOf(user);
-
+        uint256 lastPrice = fetchPrice();
         uint256 wbtcValueInWeth = wbtcBalance.mul(lastPrice);
         uint256 wethValueInWeth = wethBalance;
 
         if (wbtcValueInWeth > wethValueInWeth) {
             uint256 excessValue = (wbtcValueInWeth - wethValueInWeth) / 2;
             uint256 excessWbtc = excessValue.div(lastPrice);
+            WBTC.transferFrom(user, address(this),excessWbtc);
+            WBTC.approve(address(router),excessWbtc);
             executeSwap(WBTC, WETH, user, excessWbtc);
         } else if (wethValueInWeth > wbtcValueInWeth) {
             uint256 excessValue = (wethValueInWeth - wbtcValueInWeth) / 2;
+            WETH.transferFrom(user,address(this),excessValue);
+            WETH.approve(address(router),excessValue);
             executeSwap(WETH, WBTC, user, excessValue);
         }
     }
 
     function executeSwap(IERC20 token0, IERC20 token1, address user, uint256 amountIn) internal {
+
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: address(token0),
             tokenOut: address(token1),
@@ -141,34 +136,80 @@ contract Baltic is Ownable {
             amountOutMinimum: 0,
             sqrtPriceLimitX96: 0
         });
-
         router.exactInputSingle(params);
     }
 
-    function balwap() external onlyOwner {
-        uint256 currentPrice = fetchPrice();
-        uint256 priceChange = lastPrice > currentPrice ? lastPrice - currentPrice : currentPrice - lastPrice;
-        uint256 priceChangeInWbtc = priceChange.div(lastPrice);
+    function addTrade(address _userAddress,Trade memory _tradeInfo) internal {
+        trades[_userAddress].push(_tradeInfo);
+    }
 
-        for (uint256 i = 0; i < registeredUsers.length; i++) {
-            User storage user = users[registeredUsers[i]];
-            uint256 timeElapsed = block.timestamp - user.registrationTime;
+    function balwap(address userAddress) external onlyOwner {
+        if(users[userAddress].isFirstTime){
+            uint256 currentPrice = fetchPrice();
+            equalization(userAddress);
+            users[userAddress].initialWbtcBalance = WBTC.balanceOf(userAddress);
+            users[userAddress].lastTradePrice = currentPrice;
+            users[userAddress].isFirstTime = false;
+        }
+        else{
+            User memory thisUser = users[userAddress];
+            uint256 currentPrice = fetchPrice();
+            uint256 userLastPrice = thisUser.lastTradePrice;
+            uint256 priceChange = userLastPrice > currentPrice ? userLastPrice - currentPrice : currentPrice - userLastPrice;
+            uint256 timeElapsed = block.timestamp - thisUser.registrationTime;
             if (timeElapsed >= 3 * 30 days) {
-                if (!reRegister(registeredUsers[i])) {
-                    user.isActive = false;
-                    continue;
+                if (!reRegister(userAddress)) {
+                    thisUser.isActive = false;
+                    return ;
                 }
             }
 
-            if (currentPrice > lastPrice) {
-                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).mul(priceChangeInWbtc);
-                executeSwap(WBTC, WETH, registeredUsers[i], tradeAmount);
-            } else if (currentPrice < lastPrice) {
-                uint256 tradeAmount = user.initialWbtcBalance.mul(tradingLeverage).mul(10**(WBTC.decimals()-WETH.decimals())).mul(priceChangeInWbtc);
-                executeSwap(WETH, WBTC, registeredUsers[i], tradeAmount);
+            if (currentPrice > userLastPrice) {
+                uint256 tradeAmount = thisUser.initialWbtcBalance.mul(tradingLeverage).mul(priceChange).div(currentPrice);
+                WBTC.transferFrom(userAddress,address(this), tradeAmount);
+                WBTC.approve(address(router),tradeAmount);
+                uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
+                uint256 currentWETHAmount = WETH.balanceOf(userAddress);
+                executeSwap(WBTC, WETH, userAddress, tradeAmount);
+                uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
+                uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
+                uint256 wbtcTradeAmount = currentWBTCAmount-afterTradeWBTCAmount;
+                uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
+                string memory tradingType = "SELL";
+                Trade memory newTrade;
+                newTrade.tradingPrice=currentPrice;
+                newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
+                newTrade.wethBeforeTradeAmount=currentWETHAmount;
+                newTrade.wbtcTradeAmount=wbtcTradeAmount;
+                newTrade.wethTradeAmount=wethTradeAmount;
+                newTrade.positionType=tradingType;
+                newTrade.tradingTimestamp=block.timestamp;
+                addTrade(userAddress, newTrade);
+
+            } else if (currentPrice < userLastPrice) {
+                uint256 tradeAmount = thisUser.initialWbtcBalance.mul(tradingLeverage).mul(priceChange);
+                WETH.transferFrom(userAddress, address(this),tradeAmount);
+                WETH.approve(address(router),tradeAmount);
+                uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
+                uint256 currentWETHAmount = WETH.balanceOf(userAddress);
+                executeSwap(WETH, WBTC, userAddress, tradeAmount);
+                uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
+                uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
+                uint256 wbtcTradeAmount = currentWBTCAmount-afterTradeWBTCAmount;
+                uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
+                string memory tradingType = "BUY";
+                Trade memory newTrade;
+                newTrade.tradingPrice=currentPrice;
+                newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
+                newTrade.wethBeforeTradeAmount=currentWETHAmount;
+                newTrade.wbtcTradeAmount=wbtcTradeAmount;
+                newTrade.wethTradeAmount=wethTradeAmount;
+                newTrade.positionType=tradingType;
+                newTrade.tradingTimestamp=block.timestamp;
+                addTrade(userAddress, newTrade);
             }
+            users[userAddress].lastTradePrice = currentPrice;
         }
-        lastPrice = currentPrice;
     }
 
     function reRegister(address user) internal returns (bool) {
@@ -177,10 +218,10 @@ contract Baltic is Ownable {
 
         if (userMATICBalance >= maticAmount*(10**WMATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
             require(WMATIC.transferFrom(user, owner(), maticAmount*(10**WMATIC.decimals())), "Failed to transfer MATIC from user to owner");
-            require(alternativeToken.transferFrom(user, owner(), alternativeTokenAmount), "Failed to transfer alternative token from user to owner");
+            require(alternativeToken.transferFrom(user, owner(), alternativeTokenAmount*(10**alternativeToken.decimals())), "Failed to transfer alternative token from user to owner");
         } 
         else if (userMATICBalance >= maticAlternativeAmount*(10**WMATIC.decimals())) {
-            require(WMATIC.transferFrom(user, owner(), maticAlternativeAmount), "Failed to transfer alternative amount of MATIC from user to owner");
+            require(WMATIC.transferFrom(user, owner(), maticAlternativeAmount*(10**WMATIC.decimals())), "Failed to transfer alternative amount of MATIC from user to owner");
         } 
         else {
             users[user].isActive = false;
@@ -200,4 +241,20 @@ contract Baltic is Ownable {
         uint256 price = (sqrtPriceX96/2**96)**2;
         return price;
     }
-}
+
+    function setMaticAmount(uint256 newAmount) public onlyOwner {
+        maticAmount = newAmount;
+    }
+
+    function setAlternativeMaticAmount(uint256 newAmount) public onlyOwner {
+        maticAlternativeAmount = newAmount;
+    }
+
+    function setAlternativeTokenAmount(uint256 newAmount) public onlyOwner {
+        alternativeTokenAmount = newAmount;
+    }
+
+    function contractTermination() public {
+        delete users[msg.sender];
+        }
+    }
