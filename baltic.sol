@@ -166,9 +166,10 @@ contract Baltic is Ownable(msg.sender){
 
             if (currentPrice > userLastPrice) {
                 uint256 tradeAmount = thisUser.initialWbtcBalance.mul(tradingLeverage).mul(priceChange).div(currentPrice);
+                uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
+                require(tradeAmount<currentWBTCAmount,"insufficient btc amount");
                 WBTC.transferFrom(userAddress,address(this), tradeAmount);
                 WBTC.approve(address(router),tradeAmount);
-                uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
                 uint256 currentWETHAmount = WETH.balanceOf(userAddress);
                 executeSwap(WBTC, WETH, userAddress, tradeAmount);
                 uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
@@ -188,10 +189,11 @@ contract Baltic is Ownable(msg.sender){
 
             } else if (currentPrice < userLastPrice) {
                 uint256 tradeAmount = thisUser.initialWbtcBalance.mul(tradingLeverage).mul(priceChange);
+                uint256 currentWETHAmount = WETH.balanceOf(userAddress);
+                require(tradeAmount<currentWETHAmount,"insufficient eth amount");
                 WETH.transferFrom(userAddress, address(this),tradeAmount);
                 WETH.approve(address(router),tradeAmount);
                 uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
-                uint256 currentWETHAmount = WETH.balanceOf(userAddress);
                 executeSwap(WETH, WBTC, userAddress, tradeAmount);
                 uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
                 uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
