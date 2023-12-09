@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -174,8 +174,8 @@ contract Baltic is Ownable(msg.sender){
                 executeSwap(WBTC, WETH, userAddress, tradeAmount);
                 uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
                 uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
-                uint256 wbtcTradeAmount = currentWBTCAmount-afterTradeWBTCAmount;
-                uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
+                uint256 wbtcTradeAmount = currentWBTCAmount - afterTradeWBTCAmount;
+                uint256 wethTradeAmount = afterTradeWETHAmount - currentWETHAmount;
                 string memory tradingType = "SELL";
                 Trade memory newTrade;
                 newTrade.tradingPrice=currentPrice;
@@ -197,7 +197,7 @@ contract Baltic is Ownable(msg.sender){
                 executeSwap(WETH, WBTC, userAddress, tradeAmount);
                 uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
                 uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
-                uint256 wbtcTradeAmount = currentWBTCAmount-afterTradeWBTCAmount;
+                uint256 wbtcTradeAmount = afterTradeWBTCAmount -currentWBTCAmount;
                 uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
                 string memory tradingType = "BUY";
                 Trade memory newTrade;
