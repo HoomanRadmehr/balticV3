@@ -17,7 +17,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 
 
-contract Baltic is Ownable {
+contract Baltic is Ownable(msg.sender){
     using SafeMath for uint256;
 
     ERC20 public WMATIC;
@@ -49,7 +49,7 @@ contract Baltic is Ownable {
         uint256 tradingTimestamp;
     }
 
-    mapping(address => Trade[]) trades;
+    mapping(address => Trade[]) public trades;
     mapping(address => User) public users;
     mapping(address => bool) public IsApproved;
     address[] public registeredUsers;
@@ -236,6 +236,7 @@ contract Baltic is Ownable {
         return true;
     }
 
+
     function fetchPrice() public view returns (uint256) {
         (uint160 sqrtPriceX96,,,,,,) = pool.slot0();
         uint256 price = (sqrtPriceX96/2**96)**2;
@@ -258,3 +259,4 @@ contract Baltic is Ownable {
         delete users[msg.sender];
         }
     }
+    
