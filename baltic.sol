@@ -273,7 +273,6 @@ contract Baltic is Ownable(msg.sender){
     }
 
     function contractTermination() public {
-        delete users[msg.sender];
+            deleteUser(msg.sender);
         }
     }
-    
