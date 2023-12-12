@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 
 pragma solidity ^0.8.0;
 
@@ -255,6 +256,20 @@ contract Baltic is Ownable(msg.sender){
 
     function setAlternativeTokenAmount(uint256 newAmount) public onlyOwner {
         alternativeTokenAmount = newAmount;
+    }
+
+    function deleteUser(address _address) internal {
+        uint i;
+        for (i = 0; i < registeredUsers.length; i++) {
+            if (registeredUsers[i] == _address) {
+                // Move the last element to the position of the element to be deleted
+                registeredUsers[i] = registeredUsers[registeredUsers.length - 1];
+
+                // Remove the last element by reducing the array registeredUsers
+                delete registeredUsers[i];
+                delete users[msg.sender];
+            }
+        }
     }
 
     function contractTermination() public {
