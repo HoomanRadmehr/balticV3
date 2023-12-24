@@ -144,6 +144,10 @@ contract Baltic is Ownable(msg.sender){
         trades[_userAddress].push(_tradeInfo);
     }
 
+    function abs(int x) private pure returns (int) {
+        return x >= 0 ? x : -x;
+    }
+
     function balwap(address userAddress) external onlyOwner {
         if(users[userAddress].isFirstTime){
             uint256 currentPrice = fetchPrice();
@@ -164,53 +168,81 @@ contract Baltic is Ownable(msg.sender){
                     return ;
                 }
             }
-
+            Trade memory newTrade;
             if (currentPrice > userLastPrice) {
                 uint256 tradeAmount = thisUser.initialWbtcBalance.mul(tradingLeverage).mul(priceChange).div(currentPrice);
                 uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
-                require(tradeAmount<currentWBTCAmount,"insufficient btc amount");
-                WBTC.transferFrom(userAddress,address(this), tradeAmount);
-                WBTC.approve(address(router),tradeAmount);
                 uint256 currentWETHAmount = WETH.balanceOf(userAddress);
-                executeSwap(WBTC, WETH, userAddress, tradeAmount);
-                uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
-                uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
-                uint256 wbtcTradeAmount = currentWBTCAmount - afterTradeWBTCAmount;
-                uint256 wethTradeAmount = afterTradeWETHAmount - currentWETHAmount;
-                string memory tradingType = "SELL";
-                Trade memory newTrade;
-                newTrade.tradingPrice=currentPrice;
-                newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
-                newTrade.wethBeforeTradeAmount=currentWETHAmount;
-                newTrade.wbtcTradeAmount=wbtcTradeAmount;
-                newTrade.wethTradeAmount=wethTradeAmount;
-                newTrade.positionType=tradingType;
-                newTrade.tradingTimestamp=block.timestamp;
-                addTrade(userAddress, newTrade);
-
+                if(tradeAmount>currentWBTCAmount){
+                    equalization(userAddress);
+                    string memory tradingType = "EQUALIZATION";
+                    uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
+                    uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
+                    uint256 wbtcTradeAmount = afterTradeWBTCAmount - currentWBTCAmount;
+                    uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
+                    newTrade.tradingPrice=currentPrice;
+                    newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
+                    newTrade.wethBeforeTradeAmount=currentWETHAmount;
+                    newTrade.wbtcTradeAmount=wbtcTradeAmount;
+                    newTrade.wethTradeAmount=wethTradeAmount;
+                    newTrade.positionType=tradingType;
+                    newTrade.tradingTimestamp=block.timestamp;
+                }
+                else {
+                    string memory tradingType = "SELL";
+                    WBTC.transferFrom(userAddress,address(this), tradeAmount);
+                    WBTC.approve(address(router),tradeAmount);
+                    executeSwap(WBTC, WETH, userAddress, tradeAmount);
+                    uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
+                    uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
+                    uint256 wbtcTradeAmount = currentWBTCAmount - afterTradeWBTCAmount;
+                    uint256 wethTradeAmount = afterTradeWETHAmount - currentWETHAmount;
+                    newTrade.tradingPrice=currentPrice;
+                    newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
+                    newTrade.wethBeforeTradeAmount=currentWETHAmount;
+                    newTrade.wbtcTradeAmount=wbtcTradeAmount;
+                    newTrade.wethTradeAmount=wethTradeAmount;
+                    newTrade.positionType=tradingType;
+                    newTrade.tradingTimestamp=block.timestamp;
+                }
             } else if (currentPrice < userLastPrice) {
                 uint256 tradeAmount = thisUser.initialWbtcBalance.mul(tradingLeverage).mul(priceChange);
                 uint256 currentWETHAmount = WETH.balanceOf(userAddress);
-                require(tradeAmount<currentWETHAmount,"insufficient eth amount");
-                WETH.transferFrom(userAddress, address(this),tradeAmount);
-                WETH.approve(address(router),tradeAmount);
                 uint256 currentWBTCAmount = WBTC.balanceOf(userAddress);
-                executeSwap(WETH, WBTC, userAddress, tradeAmount);
-                uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
-                uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
-                uint256 wbtcTradeAmount = afterTradeWBTCAmount -currentWBTCAmount;
-                uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
-                string memory tradingType = "BUY";
-                Trade memory newTrade;
-                newTrade.tradingPrice=currentPrice;
-                newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
-                newTrade.wethBeforeTradeAmount=currentWETHAmount;
-                newTrade.wbtcTradeAmount=wbtcTradeAmount;
-                newTrade.wethTradeAmount=wethTradeAmount;
-                newTrade.positionType=tradingType;
-                newTrade.tradingTimestamp=block.timestamp;
-                addTrade(userAddress, newTrade);
+                if(tradeAmount>currentWETHAmount){
+                    equalization(userAddress);
+                    string memory tradingType = "EQUALIZATION";
+                    uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
+                    uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
+                    uint256 wbtcTradeAmount = currentWBTCAmount - afterTradeWBTCAmount;
+                    uint256 wethTradeAmount = afterTradeWETHAmount - currentWETHAmount;
+                    newTrade.tradingPrice=currentPrice;
+                    newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
+                    newTrade.wethBeforeTradeAmount=currentWETHAmount;
+                    newTrade.wbtcTradeAmount=wbtcTradeAmount;
+                    newTrade.wethTradeAmount=wethTradeAmount;
+                    newTrade.positionType=tradingType;
+                    newTrade.tradingTimestamp=block.timestamp;
+                }
+                else{
+                    WETH.transferFrom(userAddress, address(this),tradeAmount);
+                    WETH.approve(address(router),tradeAmount);
+                    executeSwap(WETH, WBTC, userAddress, tradeAmount);
+                    uint256 afterTradeWBTCAmount= WBTC.balanceOf(userAddress);
+                    uint256 afterTradeWETHAmount = WETH.balanceOf(userAddress);
+                    uint256 wbtcTradeAmount = afterTradeWBTCAmount -currentWBTCAmount;
+                    uint256 wethTradeAmount = currentWETHAmount - afterTradeWETHAmount;
+                    string memory tradingType = "BUY";
+                    newTrade.tradingPrice=currentPrice;
+                    newTrade.wbtcBeforeTradeAmount=currentWBTCAmount;
+                    newTrade.wethBeforeTradeAmount=currentWETHAmount;
+                    newTrade.wbtcTradeAmount=wbtcTradeAmount;
+                    newTrade.wethTradeAmount=wethTradeAmount;
+                    newTrade.positionType=tradingType;
+                    newTrade.tradingTimestamp=block.timestamp;
+                }
             }
+            addTrade(userAddress, newTrade);
             users[userAddress].lastTradePrice = currentPrice;
         }
     }
