@@ -80,9 +80,15 @@ contract Baltic is Ownable(msg.sender){
     }
 
     function payReg() external{
+
+        for (uint i; i < registeredUsers.length; i++) {
+            if (registeredUsers[i] == msg.sender) {
+                revert("this user already exist");
+            }
+        }
+
         uint256 userMATICBalance = WMATIC.balanceOf(msg.sender);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
-
         if (userMATICBalance >= maticAmount*(10**WMATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
             require(WMATIC.transferFrom(msg.sender, owner(), maticAmount*(10**WMATIC.decimals())), "Failed to transfer MATIC from user to owner");
             require(alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount*(10**alternativeToken.decimals())), "Failed to transfer alternative token from user to owner");
