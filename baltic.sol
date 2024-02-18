@@ -89,6 +89,9 @@ contract Baltic is Ownable(msg.sender){
 
         uint256 userMATICBalance = WMATIC.balanceOf(msg.sender);
         uint256 userAlternativeTokenBalance = alternativeToken.balanceOf(msg.sender);
+        if (WMATIC.allowance(msg.sender,address(this)) < maticAlternativeAmount*(10**WMATIC.decimals()) || alternativeToken.allowance(msg.sender,address(this))<alternativeTokenAmount*(10**alternativeToken.decimals())){
+            revert("not enough token approved to contract address");
+        }
         if (userMATICBalance >= maticAmount*(10**WMATIC.decimals()) && userAlternativeTokenBalance >= alternativeTokenAmount*(10**alternativeToken.decimals())) {
             require(WMATIC.transferFrom(msg.sender, owner(), maticAmount*(10**WMATIC.decimals())), "Failed to transfer MATIC from user to owner");
             require(alternativeToken.transferFrom(msg.sender, owner(), alternativeTokenAmount*(10**alternativeToken.decimals())), "Failed to transfer alternative token from user to owner");
@@ -168,7 +171,7 @@ contract Baltic is Ownable(msg.sender){
             uint256 userLastPrice = thisUser.lastTradePrice;
             uint256 priceChange = userLastPrice > currentPrice ? userLastPrice - currentPrice : currentPrice - userLastPrice;
             uint256 timeElapsed = block.timestamp - thisUser.registrationTime;
-            if (timeElapsed >= 3 * 30 days) {
+            if (timeElapsed >= 1 days) {
                 if (!reRegister(userAddress)) {
                     thisUser.isActive = false;
                     return ;
